@@ -6,8 +6,8 @@
 double epsilon = 0.000001;
 int glob;
 
-typedef struct enkelx_t enkelx_t;
-struct enkelx_t{
+typedef struct simplex_t simplex_t;
+struct simplex_t{
   int m;
   int n;
   int* var;
@@ -18,7 +18,7 @@ struct enkelx_t{
   double y;
 };
 
-int init(enkelx_t* s, int m, int n, double** a, double* b, double* c, double* x, double y, int* var)
+int init(simplex_t* s, int m, int n, double** a, double* b, double* c, double* x, double y, int* var)
 {
   int i, k;
   s->m = m;
@@ -43,7 +43,7 @@ int init(enkelx_t* s, int m, int n, double** a, double* b, double* c, double* x,
   return k;
 }
 
-int select_nonbasic(enkelx_t* s)
+int select_nonbasic(simplex_t* s)
 {
   int i;
   for(i = 0; i < s->n; i += 1) {
@@ -54,7 +54,7 @@ int select_nonbasic(enkelx_t* s)
   return -1;
 }
 
-int initial(enkelx_t* s, int m, int n, double** a, double* b, double* c, double* x,  double y, int* var)
+int initial(simplex_t* s, int m, int n, double** a, double* b, double* c, double* x,  double y, int* var)
 {
   int i,j,k;
   double w;
@@ -62,7 +62,7 @@ int initial(enkelx_t* s, int m, int n, double** a, double* b, double* c, double*
   return 1;
 }
 
-void pivot(enkelx_t* s, int row, int col) {
+void pivot(simplex_t* s, int row, int col) {
   double** a = s->a;
   double* b = s->b;
   double* c = s->c;
@@ -110,7 +110,7 @@ void pivot(enkelx_t* s, int row, int col) {
 }
 
 double xsimplex(int m, int n, double** a, double* b, double* c, double* x,  double y, int* var, int h) {
-  enkelx_t s;
+  simplex_t s;
   int i, row, col;
   if(! initial(&s,m,n,a,b,c,x,y,var)){
     free(s.var);
