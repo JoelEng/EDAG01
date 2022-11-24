@@ -1,10 +1,29 @@
-#include "set.h"
 #include <math.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 double epsilon = 0.000001;
+
+typedef struct node_t node_t;
+struct node_t {
+  int m, n, k, h;
+  double xh, ak, bk;
+  double *min;
+  double *max;
+  double **a;
+  double *b;
+  double *x;
+  double *c;
+  double z;
+};
+
+typedef struct set_t set_t;
+struct set_t {
+  set_t *succ;
+  node_t *node;
+};
 
 typedef struct simplex_t simplex_t;
 struct simplex_t {
@@ -17,6 +36,56 @@ struct simplex_t {
   double *c;
   double y;
 };
+
+set_t *new_set(node_t *node) {
+  set_t *set;
+
+  set = malloc(sizeof(set_t));
+
+  set->succ = NULL;
+  set->node = node;
+
+  return set;
+}
+
+bool add(set_t *set, node_t *node) {
+  set_t *current = set;
+  if (current->node == node) {
+    return false;
+  }
+  while (current->succ != NULL) {
+    if (current->succ->node == node) {
+      return false;
+    }
+    current = current->succ;
+  }
+  current->succ = new_set(node);
+  return true;
+}
+
+bool remove_node(set_t *set, node_t *node) {
+  set_t *current = set;
+  set_t *temp;
+
+  if (set->node == node) {
+    if (set->succ == NULL) {
+      *set = *new_set(NULL);
+      return true;
+    }
+    *set = *set->succ;
+    return true;
+  }
+
+  while (current->succ != NULL) {
+    if (current->succ->node == node) {
+      temp = current->succ;
+      current->succ = current->succ->succ;
+      return true;
+    }
+    current = current->succ;
+  }
+  return false;
+}
 
 node_t initial_node(int m, int n, double **a, double *b, double *c) {
   node_t p;
@@ -121,7 +190,9 @@ node_t extend(node_t *p, int m, int n, double **a, double *b, double *c, int k,
 
 int is_integer(double *xp) {
   // xp is a pointer to a double
+
   double x = *xp;
+  // printf("kom hit %d\n", xp);
   double r = lround(x); // ISO C lround
   if (fabs(r - x) < epsilon) {
     *xp = r;
@@ -151,7 +222,7 @@ void bound(node_t p, set_t *h, double *zp, double *x) {
     }
 
     set_t *current = h;
-    while (current != NULL) {
+    while (current->node != NULL) {
       if (current->node->z < p.z) {
         remove_node(h, current->node); // h borde gå att byta ut mot current,
                                        // men vi vågar inte
@@ -201,6 +272,7 @@ double simplex(int m, int n, double **a, double *b, double *c, double *x,
 void succ(node_t *p, set_t *h, int m, int n, double **a, double *b, double *c,
           int k, double ak, double bk, double *zp, double *x) {
   node_t *q = malloc(sizeof(node_t));
+
   *q = extend(p, m, n, a, b, c, k, ak, bk);
   if (&q == NULL) {
     return;
@@ -218,31 +290,24 @@ void succ(node_t *p, set_t *h, int m, int n, double **a, double *b, double *c,
 }
 
 double intopt(int m, int n, double **a, double *b, double *c, double *x) {
-  node_t *p = malloc(sizeof(node_t));
-  p->m = m;
-  p->n = n;
-  p->a = a;
-  p->b = b;
-  p->c = c;
+  node_t p = initial_node(m, n, a, b, c);
 
-  set_t *h = new_set(p);
+  set_t *h = new_set(&p);
   double z = -INFINITY; // best integer solution found so far
-  p->z = simplex(p->m, p->n, p->a, p->b, p->c, p->x, 0);
+  p.z = simplex(p.m, p.n, p.a, p.b, p.c, p.x, 0);
 
-  if (integer(p) || !isfinite(p->z)) {
-    z = p->z;
-    if (integer(p)) {
-      *x = *p->x;
+  if (integer(&p) || !isfinite(p.z)) {
+    z = p.z;
+    if (integer(&p)) {
+      x = p.x;
     }
-    free(p);
     return z;
   }
-  branch(p, z);
-  while (h != NULL) {
-    remove_node(h, p);
-    succ(p, h, m, n, a, b, c, p->h, 1, floor(p->xh), &z, x);
-    succ(p, h, m, n, a, b, c, p->h, -1, -ceil(p->xh), &z, x);
-    free(p);
+  branch(&p, z);
+  while (h->node != NULL) {
+    remove_node(h, &p);
+    succ(&p, h, m, n, a, b, c, p.h, 1, floor(p.xh), &z, x);
+    succ(&p, h, m, n, a, b, c, p.h, -1, -ceil(p.xh), &z, x);
   }
   if (z == -INFINITY) {
     return NAN;
@@ -540,7 +605,6 @@ int main() {
       printf("%10.3lf", c[i]);
     }
   }
-  printf("\n");
 
   for (i = 0; i < m; i += 1) {
     printf("\t");
@@ -554,7 +618,8 @@ int main() {
     printf(" \u2264 %8.3lf\n", b[i]);
   }
 
-  double res = simplex(m, n, a, b, c, x, 0);
+  double res = intopt(m, n, a, b, c, x);
+
   printf("%lf", res);
   free(x);
   for (i = 0; i < m; i += 1) {
@@ -564,21 +629,4 @@ int main() {
   free(b);
   free(c);
   return 0;
-
-  node_t *node = malloc(sizeof(node_t));
-  node->m = 1;
-  set_t *s = new_set(node);
-
-  node_t *node2 = malloc(sizeof(node_t));
-  node2->m = 10;
-  add(s, node2);
-
-  node_t *node3 = malloc(sizeof(node_t));
-  node3->m = 20;
-  add(s, node3);
-
-  if (remove_node(s, node)) {
-    printf("wow %d\n", s->node->m);
-    printf("wow succ %d\n", s->succ->node->m);
-  }
 }
