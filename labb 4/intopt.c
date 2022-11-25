@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 double epsilon = 0.000001;
 
@@ -38,9 +39,7 @@ struct simplex_t {
 };
 
 set_t *new_set(node_t *node) {
-  set_t *set;
-
-  set = malloc(sizeof(set_t));
+  set_t *set = calloc(1, sizeof(set_t));
 
   set->succ = NULL;
   set->node = node;
@@ -50,13 +49,8 @@ set_t *new_set(node_t *node) {
 
 bool add(set_t *set, node_t *node) {
   set_t *current = set;
-  if (current->node == node) {
-    return false;
-  }
+
   while (current->succ != NULL) {
-    if (current->succ->node == node) {
-      return false;
-    }
     current = current->succ;
   }
   current->succ = new_set(node);
@@ -87,101 +81,97 @@ bool remove_node(set_t *set, node_t *node) {
   return false;
 }
 
-node_t initial_node(int m, int n, double **a, double *b, double *c) {
-  node_t p;
+node_t *initial_node(int m, int n, double **a, double *b, double *c) {
+  node_t *p = calloc(1, sizeof(node_t));
   int i, j;
-  p.a = calloc(m + 1, sizeof(double *));
+  p->a = calloc(m + 1, sizeof(double *));
   for (i = 0; i < m + 1; i += 1) {
-    p.a[i] = calloc(n + 1, sizeof(double));
+    p->a[i] = calloc(n + 1, sizeof(double));
   }
-  p.b = calloc(m + 1, sizeof(double));
-  p.c = calloc(n + 1, sizeof(double));
-  p.x = calloc(n + 1, sizeof(double));
-  p.min = calloc(n, sizeof(double));
-  p.max = calloc(n, sizeof(double));
-  p.m = m;
-  p.n = n;
+  p->b = calloc(m + 1, sizeof(double));
+  p->c = calloc(n + 1, sizeof(double));
+  p->x = calloc(n + 1, sizeof(double));
+  p->min = calloc(n, sizeof(double));
+  p->max = calloc(n, sizeof(double));
+  p->m = m;
+  p->n = n;
 
-  for (i = 0; i < m; i += 1) { // kanske andra längder på dessa
+  for (i = 0; i < m; i += 1) {
     for (j = 0; j < n; j += 1) {
-      p.a[i][j] = a[i][j];
+      p->a[i][j] = a[i][j];
     }
   }
-  for (i = 0; i < m; i += 1) {
-    p.b[i] = b[i];
-  }
-  for (i = 0; i < n; i += 1) {
-    p.c[i] = c[i];
-  }
+ memcpy(p->b, b, sizeof(double) * m); //kanske onödigt
+  memcpy(p->c, c, sizeof(double) * n);
 
   for (i = 0; i < n; i += 1) {
-    p.min[i] = -INFINITY;
-    p.max[i] = INFINITY;
+    p->min[i] = -INFINITY;
+    p->max[i] = INFINITY;
   }
   return p;
 }
 
-node_t extend(node_t *p, int m, int n, double **a, double *b, double *c, int k,
+node_t *extend(node_t *p, int m, int n, double **a, double *b, double *c, int k,
               double ak, double bk) {
-  node_t q;
+  node_t *q = calloc(1, sizeof(node_t));
   int i, j;
-  q.k = k;
-  q.ak = ak;
-  q.bk = bk;
+  q->k = k;
+  q->ak = ak;
+  q->bk = bk;
 
   if (ak > 0 && p->max[k] < INFINITY) {
-    q.m = p->m;
+    q->m = p->m;
   } else if (ak < 0 && p->min[k] > 0) {
-    q.m = p->m;
+    q->m = p->m;
   } else {
-    q.m = p->m + 1;
+    q->m = p->m + 1;
   }
 
-  q.n = p->n;
-  q.h = -1;
-  q.a = calloc(q.m + 1, sizeof(double *));
-  for (i = 0; i < m + 1; i += 1) {
-    q.a[i] = calloc(q.n + 1, sizeof(double));
+  q->n = p->n;
+  q->h = -1;
+  q->a = calloc(q->m + 1, sizeof(double *));
+  for (i = 0; i < q->m + 1; i += 1) {
+    q->a[i] = calloc(q->n + 1, sizeof(double));
   }
-  q.b = calloc(q.m + 1, sizeof(double));
-  q.c = calloc(q.n + 1, sizeof(double));
-  q.x = calloc(q.n + 1, sizeof(double));
-  q.min = calloc(n, sizeof(double));
-  q.max = calloc(n, sizeof(double));
+  q->b = calloc(q->m + 1, sizeof(double));
+  q->c = calloc(q->n + 1, sizeof(double));
+  q->x = calloc(q->n + 1, sizeof(double));
+  q->min = calloc(n, sizeof(double));
+  q->max = calloc(n, sizeof(double));
 
-  for (i = 0; i < n; i += 1) {
-    q.min[i] = p->min[i];
-    q.max[i] = p->max[i];
+  for (i = 0; i < p->n; i += 1) {
+    q->min[i] = p->min[i];
+    q->max[i] = p->max[i];
   }
   for (i = 0; i < m; i += 1) {
-    for (j = 0; j < n; j += 1) { // kanske ska va n + 1. oklart.
-      q.a[i] = p->a[i];
+    for (j = 0; j < n; j += 1) {
+      q->a[i][j] = p->a[i][j];
     }
   }
   for (i = 0; i < m; i += 1) {
-    q.b[i] = b[i];
+    q->b[i] = b[i];
   }
-  for (i = 0; i < n; i += 1) { // + 1?
-    q.c[i] = c[i];
+  for (i = 0; i < n; i += 1) {
+    q->c[i] = c[i];
   }
 
   if (ak > 0) {
-    if (q.max[k] == INFINITY || bk < q.max[k]) {
-      q.max[k] = bk;
+    if (q->max[k] == INFINITY || bk < q->max[k]) {
+      q->max[k] = bk;
     }
-  } else if (q.min[k] == -INFINITY || -bk > q.min[k]) {
-    q.min[k] = -bk;
+  } else if (q->min[k] == -INFINITY || -bk > q->min[k]) {
+    q->min[k] = -bk;
   }
 
   for (i = m, j = 0; j < n; j += 1) {
-    if (q.min[j] > -INFINITY) {
-      q.a[i][j] = 1;
-      q.b[i] = q.max[j];
+    if (q->min[j] > -INFINITY) {
+      q->a[i][j] = 1;
+      q->b[i] = -q->min[j];
       i += 1;
     }
-    if (q.max[j] < INFINITY) {
-      q.a[i][j] = 1;
-      q.b[i] = q.max[j];
+    if (q->max[j] < INFINITY) {
+      q->a[i][j] = 1;
+      q->b[i] = q->max[j];
       i += 1;
     }
   }
@@ -192,7 +182,6 @@ int is_integer(double *xp) {
   // xp is a pointer to a double
 
   double x = *xp;
-  // printf("kom hit %d\n", xp);
   double r = lround(x); // ISO C lround
   if (fabs(r - x) < epsilon) {
     *xp = r;
@@ -212,18 +201,19 @@ int integer(node_t *p) {
   return 1;
 }
 
-void bound(node_t p, set_t *h, double *zp, double *x) {
+void bound(node_t *p, set_t *h, double *zp, double *x) {
   // zp is a pointer to max z found so far
   int i;
-  if (p.z > *zp) {
-    *zp = p.z;
-    for (i = 0; i < p.n; i += 1) {
-      x[i] = p.x[i];
-    }
+  if (p->z > *zp) {
+    *zp = p->z;
+    // for (i = 0; i < p.n; i += 1) {
+    //   x[i] = p.x[i];
+    // }
+    memcpy(x, p->x, sizeof(double) * p->n); //kanske onödigt
 
     set_t *current = h;
     while (current->node != NULL) {
-      if (current->node->z < p.z) {
+      if (current->node->z < p->z) {
         remove_node(h, current->node); // h borde gå att byta ut mot current,
                                        // men vi vågar inte
       }
@@ -246,7 +236,7 @@ int branch(node_t *q, double z) {
         min = q->min[h];
       }
       max = q->max[h];
-      if (q->x[h] < min || q->x[h] > max) {
+      if (floor(q->x[h]) < min || ceil(q->x[h]) > max) {
         continue;
       }
       q->h = h;
@@ -271,16 +261,15 @@ double simplex(int m, int n, double **a, double *b, double *c, double *x,
 
 void succ(node_t *p, set_t *h, int m, int n, double **a, double *b, double *c,
           int k, double ak, double bk, double *zp, double *x) {
-  node_t *q = malloc(sizeof(node_t));
+  node_t *q = extend(p, m, n, a, b, c, k, ak, bk);
 
-  *q = extend(p, m, n, a, b, c, k, ak, bk);
-  if (&q == NULL) {
+  if (q == NULL) { //tog bort &?
     return;
   }
   q->z = simplex(q->m, q->n, q->a, q->b, q->c, q->x, 0);
   if (isfinite(q->z)) {
     if (integer(q)) {
-      bound(*q, h, zp, x);
+      bound(q, h, zp, x);
     } else if (branch(q, *zp)) {
       add(h, q);
       return;
@@ -290,24 +279,28 @@ void succ(node_t *p, set_t *h, int m, int n, double **a, double *b, double *c,
 }
 
 double intopt(int m, int n, double **a, double *b, double *c, double *x) {
-  node_t p = initial_node(m, n, a, b, c);
+  node_t *p = initial_node(m, n, a, b, c);
 
-  set_t *h = new_set(&p);
+  set_t *h = new_set(p);
+
   double z = -INFINITY; // best integer solution found so far
-  p.z = simplex(p.m, p.n, p.a, p.b, p.c, p.x, 0);
+  p->z = simplex(p->m, p->n, p->a, p->b, p->c, p->x, 0);
 
-  if (integer(&p) || !isfinite(p.z)) {
-    z = p.z;
-    if (integer(&p)) {
-      x = p.x;
+  if (integer(p) || !isfinite(p->z)) {
+    z = p->z;
+    if (integer(p)) {
+      printf("inne\n");
+      memcpy(x, p->x, sizeof(double)  * p->n); //onödigt?
+      //delete p
     }
+    
     return z;
   }
-  branch(&p, z);
+  branch(p, z);
   while (h->node != NULL) {
-    remove_node(h, &p);
-    succ(&p, h, m, n, a, b, c, p.h, 1, floor(p.xh), &z, x);
-    succ(&p, h, m, n, a, b, c, p.h, -1, -ceil(p.xh), &z, x);
+    remove_node(h, p); //måste poppa nytt p istället för att göra remove!!!!!
+    succ(p, h, m, n, a, b, c, p->h, 1, floor(p->xh), &z, x);
+    succ(p, h, m, n, a, b, c, p->h, -1, -ceil(p->xh), &z, x);
   }
   if (z == -INFINITY) {
     return NAN;
@@ -450,6 +443,7 @@ double xsimplex(int m, int n, double **a, double *b, double *c, double *x,
   }
 
   if (h == 0) {
+    printf("h==0\n");
     for (i = 0; i < n; i += 1) {
       if (s.var[i] < n) {
         x[s.var[i]] = 0;
@@ -620,7 +614,7 @@ int main() {
 
   double res = intopt(m, n, a, b, c, x);
 
-  printf("%lf", res);
+  printf("ANSWER IS: %lf \n", res);
   free(x);
   for (i = 0; i < m; i += 1) {
     free(a[i]);
