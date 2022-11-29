@@ -279,12 +279,15 @@ void succ(node_t *p, set_t *h, int m, int n, double **a, double *b, double *c,
     return;
   }
   q->z = simplex(q->m, q->n, q->a, q->b, q->c, q->x, 0);
+  printf("q.z = %lf\n", q->z);
   if (isfinite(q->z)) {
+    printf("innuti isfinite\n");
     if (integer(q)) {
       bound(q, h, zp, x);
     } else if (branch(q, *zp)) {
+      printf("efter branch1\n");
       if (h->node == NULL) {
-        h = new_set(q);
+        *h = *new_set(q);
       } else {
         add(h, q);
       }
