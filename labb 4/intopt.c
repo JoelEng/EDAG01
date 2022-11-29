@@ -81,6 +81,12 @@ bool remove_node(set_t *set, node_t *node) {
   return false;
 }
 
+node_t *pop(set_t *set) {
+  node_t *node = set->node;
+  remove_node(set, node);
+  return node;
+}
+
 node_t *initial_node(int m, int n, double **a, double *b, double *c) {
   node_t *p = calloc(1, sizeof(node_t));
   int i, j;
@@ -101,7 +107,7 @@ node_t *initial_node(int m, int n, double **a, double *b, double *c) {
       p->a[i][j] = a[i][j];
     }
   }
- memcpy(p->b, b, sizeof(double) * m); //kanske onödigt
+  memcpy(p->b, b, sizeof(double) * m); // kanske onödigt
   memcpy(p->c, c, sizeof(double) * n);
 
   for (i = 0; i < n; i += 1) {
@@ -112,7 +118,7 @@ node_t *initial_node(int m, int n, double **a, double *b, double *c) {
 }
 
 node_t *extend(node_t *p, int m, int n, double **a, double *b, double *c, int k,
-              double ak, double bk) {
+               double ak, double bk) {
   node_t *q = calloc(1, sizeof(node_t));
   int i, j;
   q->k = k;
@@ -145,10 +151,8 @@ node_t *extend(node_t *p, int m, int n, double **a, double *b, double *c, int k,
   }
   for (i = 0; i < m; i += 1) {
     for (j = 0; j < n; j += 1) {
-      q->a[i][j] = p->a[i][j];
+      q->a[i][j] = a[i][j];
     }
-  }
-  for (i = 0; i < m; i += 1) {
     q->b[i] = b[i];
   }
   for (i = 0; i < n; i += 1) {
@@ -165,7 +169,7 @@ node_t *extend(node_t *p, int m, int n, double **a, double *b, double *c, int k,
 
   for (i = m, j = 0; j < n; j += 1) {
     if (q->min[j] > -INFINITY) {
-      q->a[i][j] = 1;
+      q->a[i][j] = -1;
       q->b[i] = -q->min[j];
       i += 1;
     }
@@ -203,13 +207,17 @@ int integer(node_t *p) {
 
 void bound(node_t *p, set_t *h, double *zp, double *x) {
   // zp is a pointer to max z found so far
+  if (p == NULL) {
+    return;
+  }
+
   int i;
   if (p->z > *zp) {
     *zp = p->z;
     // for (i = 0; i < p.n; i += 1) {
     //   x[i] = p.x[i];
     // }
-    memcpy(x, p->x, sizeof(double) * p->n); //kanske onödigt
+    memcpy(x, p->x, sizeof(double) * p->n); // kanske onödigt
 
     set_t *current = h;
     while (current->node != NULL) {
@@ -246,10 +254,10 @@ int branch(node_t *q, double z) {
         free(q->a[i]);
       }
 
-      free(q->a);
-      free(q->b);
-      free(q->c);
-      free(q->x);
+      // free(q->a);
+      // free(q->b);
+      // free(q->c);
+      // free(q->x);
 
       return 1;
     }
@@ -263,10 +271,11 @@ void succ(node_t *p, set_t *h, int m, int n, double **a, double *b, double *c,
           int k, double ak, double bk, double *zp, double *x) {
   node_t *q = extend(p, m, n, a, b, c, k, ak, bk);
 
-  if (q == NULL) { //tog bort &?
+  if (q == NULL) { // tog bort &?
     return;
   }
   q->z = simplex(q->m, q->n, q->a, q->b, q->c, q->x, 0);
+  printf("q.z = %lf\n", q->z);
   if (isfinite(q->z)) {
     if (integer(q)) {
       bound(q, h, zp, x);
@@ -285,20 +294,20 @@ double intopt(int m, int n, double **a, double *b, double *c, double *x) {
 
   double z = -INFINITY; // best integer solution found so far
   p->z = simplex(p->m, p->n, p->a, p->b, p->c, p->x, 0);
-
+  printf("p.z = %lf\n", p->z);
   if (integer(p) || !isfinite(p->z)) {
     z = p->z;
     if (integer(p)) {
-      printf("inne\n");
-      memcpy(x, p->x, sizeof(double)  * p->n); //onödigt?
-      //delete p
+      memcpy(x, p->x, sizeof(double) * p->n); // onödigt?
+      // delete p
     }
-    
+
     return z;
   }
   branch(p, z);
   while (h->node != NULL) {
-    remove_node(h, p); //måste poppa nytt p istället för att göra remove!!!!!
+    p = pop(h);
+    // printf("p.z = %lf\n", p->z);
     succ(p, h, m, n, a, b, c, p->h, 1, floor(p->xh), &z, x);
     succ(p, h, m, n, a, b, c, p->h, -1, -ceil(p->xh), &z, x);
   }
@@ -406,9 +415,9 @@ void prepare(simplex_t *s, int k) {
     s->var[i] = s->var[i - 1];
   }
   s->var[n] = m + n;
-  n = n + 1;
+  n += 1;
 
-  for (i = 0; i < m; i++) {
+  for (i = 0; i < m; i += 1) {
     s->a[i][n - 1] = -1;
   }
   s->x = calloc(m + n, sizeof(double));
@@ -443,15 +452,14 @@ double xsimplex(int m, int n, double **a, double *b, double *c, double *x,
   }
 
   if (h == 0) {
-    printf("h==0\n");
     for (i = 0; i < n; i += 1) {
       if (s.var[i] < n) {
         x[s.var[i]] = 0;
       }
     }
     for (i = 0; i < m; i += 1) {
-      if (s.var[n + 1] < n) {
-        x[s.var[n + 1]] = s.b[i];
+      if (s.var[n + i] < n) {
+        x[s.var[n + i]] = s.b[i];
       }
     }
     free(s.var);
@@ -471,7 +479,7 @@ int initial(simplex_t *s, int m, int n, double **a, double *b, double *c,
   int i, j, k;
   double w;
   k = init(s, m, n, a, b, c, x, y, var);
-  if (b[k] >= 0) {
+  if (s->b[k] >= 0) {
     return 1;
   }
   prepare(s, k);
@@ -507,13 +515,11 @@ int initial(simplex_t *s, int m, int n, double **a, double *b, double *c,
     k = s->var[i];
     s->var[i] = s->var[n - 1];
     s->var[n - 1] = k;
-    for (k = 0; k < m; k = k + 1) {
+    for (k = 0; k < m; k += 1) {
       w = s->a[k][n - 1];
       s->a[k][n - 1] = s->a[k][i];
       s->a[k][i] = w;
     }
-  } else {
-    // x n+m is nonbasic and last. forget it
   }
 
   free(s->c);
@@ -523,8 +529,7 @@ int initial(simplex_t *s, int m, int n, double **a, double *b, double *c,
     s->var[k] = s->var[k + 1];
   }
 
-  n = s->n - 1;
-  s->n = s->n - 1;
+  n = --s->n;
   double *t;
   t = calloc(n, sizeof(double));
 
