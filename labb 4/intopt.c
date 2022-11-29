@@ -6,7 +6,6 @@
 #include <string.h>
 
 double epsilon = 0.000001;
-int nodes = 0;
 
 typedef struct node_t node_t;
 struct node_t {
@@ -44,7 +43,7 @@ set_t *new_set(node_t *node) {
 
   set->succ = NULL;
   set->node = node;
-  nodes++;
+
   return set;
 }
 
@@ -55,18 +54,16 @@ bool add(set_t *set, node_t *node) {
     current = current->succ;
   }
   current->succ = new_set(node);
-  nodes++;
   return true;
 }
 
 bool remove_node(set_t *set, node_t *node) {
   set_t *current = set;
   set_t *temp;
-  nodes--;
 
   if (set->node == node) {
     if (set->succ == NULL) {
-      *set = *new_set(NULL);
+      set->node = NULL;
       return true;
     }
     *set = *set->succ;
@@ -238,7 +235,9 @@ int branch(node_t *q, double z) {
   if (q->z < z) {
     return 0;
   }
+
   int h, i;
+
   for (h = 0; h < q->n; h += 1) {
     if (!is_integer(&q->x[h])) {
       if (q->min[h] == -INFINITY) {
@@ -247,9 +246,11 @@ int branch(node_t *q, double z) {
         min = q->min[h];
       }
       max = q->max[h];
+
       if (floor(q->x[h]) < min || ceil(q->x[h]) > max) {
         continue;
       }
+
       q->h = h;
       q->xh = q->x[h];
 
@@ -264,8 +265,8 @@ int branch(node_t *q, double z) {
 
       return 1;
     }
-    return 0;
   }
+  return 0;
 }
 double simplex(int m, int n, double **a, double *b, double *c, double *x,
                double y);
@@ -278,7 +279,6 @@ void succ(node_t *p, set_t *h, int m, int n, double **a, double *b, double *c,
     return;
   }
   q->z = simplex(q->m, q->n, q->a, q->b, q->c, q->x, 0);
-  printf("q.z = %lf\n", q->z);
   if (isfinite(q->z)) {
     if (integer(q)) {
       bound(q, h, zp, x);
@@ -302,7 +302,6 @@ double intopt(int m, int n, double **a, double *b, double *c, double *x) {
 
   double z = -INFINITY; // best integer solution found so far
   p->z = simplex(p->m, p->n, p->a, p->b, p->c, p->x, 0);
-  printf("p.z = %lf\n", p->z);
   if (integer(p) || !isfinite(p->z)) {
     z = p->z;
     if (integer(p)) {
@@ -314,15 +313,11 @@ double intopt(int m, int n, double **a, double *b, double *c, double *x) {
   }
   branch(p, z);
   while (h->node != NULL) {
-    printf("Antal noder %d\n", nodes);
     p = pop(h);
-    printf("succ p.z = %lf\n", p->z);
-    printf("Antal noder %d\n", nodes);
     succ(p, h, m, n, a, b, c, p->h, 1, floor(p->xh), &z, x);
     succ(p, h, m, n, a, b, c, p->h, -1, -ceil(p->xh), &z, x);
   }
   if (z == -INFINITY) {
-    printf("intopt NAN\n");
     return NAN;
   } else {
     return z;
@@ -446,7 +441,6 @@ double xsimplex(int m, int n, double **a, double *b, double *c, double *x,
     free(s.var);
     return NAN;
   }
-  printf("Förbi");
 
   while ((col = select_nonbasic(&s)) >= 0) {
     row = -1;
@@ -491,15 +485,13 @@ int initial(simplex_t *s, int m, int n, double **a, double *b, double *c,
   int i, j, k;
   double w;
   k = init(s, m, n, a, b, c, x, y, var);
-  printf("k är: %d\n", k);
   if (s->b[k] >= 0) {
-    printf("b är: %lf\n", s->b[k]);
     return 1;
   }
   prepare(s, k);
   n = s->n;
   s->y = xsimplex(m, n, s->a, s->b, s->c, s->x, 0, s->var, 1);
-
+ 
   for (i = 0; i < m + n; i += 1) {
     if (s->var[i] == m + n - 1) {
       if (fabs(s->x[i]) > epsilon) {
