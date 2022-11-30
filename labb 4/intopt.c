@@ -75,8 +75,11 @@ bool remove_node(set_t *set, node_t *node) {
       temp = current->succ;
       current->succ = current->succ->succ;
       return true;
+    } else if (current->succ != NULL) {
+      current = current->succ;
+    } else {
+      return false;
     }
-    current = current->succ;
   }
   return false;
 }
@@ -225,7 +228,11 @@ void bound(node_t *p, set_t *h, double *zp, double *x) {
         remove_node(h, current->node); // h borde gå att byta ut mot
                                        // current, men vi vågar inte
       }
-      current = current->succ;
+      if (current->succ != NULL) {
+        current = current->succ;
+      } else {
+        return;
+      }
     }
   }
 }
@@ -254,14 +261,14 @@ int branch(node_t *q, double z) {
       q->h = h;
       q->xh = q->x[h];
 
-      // for (i = 0; i < q->m; i += 1) {
-      //   free(q->a[i]);
-      // }
+      for (i = 0; i < q->m; i += 1) {
+        free(q->a[i]);
+      }
 
-      // free(q->a);
-      // free(q->b);
-      // free(q->c);
-      // free(q->x);
+      free(q->a);
+      free(q->b);
+      free(q->c);
+      free(q->x);
 
       return 1;
     }
@@ -279,13 +286,10 @@ void succ(node_t *p, set_t *h, int m, int n, double **a, double *b, double *c,
     return;
   }
   q->z = simplex(q->m, q->n, q->a, q->b, q->c, q->x, 0);
-  printf("q.z = %lf\n", q->z);
   if (isfinite(q->z)) {
-    printf("innuti isfinite\n");
     if (integer(q)) {
       bound(q, h, zp, x);
     } else if (branch(q, *zp)) {
-      printf("efter branch1\n");
       if (h->node == NULL) {
         *h = *new_set(q);
       } else {
@@ -320,6 +324,7 @@ double intopt(int m, int n, double **a, double *b, double *c, double *x) {
     succ(p, h, m, n, a, b, c, p->h, 1, floor(p->xh), &z, x);
     succ(p, h, m, n, a, b, c, p->h, -1, -ceil(p->xh), &z, x);
   }
+  free(p);
   if (z == -INFINITY) {
     return NAN;
   } else {
@@ -494,7 +499,7 @@ int initial(simplex_t *s, int m, int n, double **a, double *b, double *c,
   prepare(s, k);
   n = s->n;
   s->y = xsimplex(m, n, s->a, s->b, s->c, s->x, 0, s->var, 1);
- 
+
   for (i = 0; i < m + n; i += 1) {
     if (s->var[i] == m + n - 1) {
       if (fabs(s->x[i]) > epsilon) {
@@ -571,70 +576,4 @@ int initial(simplex_t *s, int m, int n, double **a, double *b, double *c,
 double simplex(int m, int n, double **a, double *b, double *c, double *x,
                double y) {
   return xsimplex(m, n, a, b, c, x, y, NULL, 0);
-}
-
-int main() {
-  int i, j;
-  int m;
-  int n;
-  scanf("%d %d", &m, &n);
-  double *c;
-  double **a;
-  double *b;
-
-  c = calloc(n, sizeof(double));
-  a = calloc(m, sizeof(double *));
-  for (i = 0; i < m; i += 1) {
-    a[i] = calloc(n + 1, sizeof(double));
-  }
-  b = calloc(m, sizeof(double));
-
-  for (i = 0; i < n; i += 1) {
-    scanf("%lf", &c[i]);
-  }
-
-  for (i = 0; i < m; i += 1) {
-    for (j = 0; j < n; j += 1) {
-      scanf("%lf", &a[i][j]);
-    }
-  }
-
-  for (i = 0; i < m; i += 1) {
-    scanf("%lf", &b[i]);
-  }
-
-  double *x = calloc(m, sizeof(double));
-
-  printf("max Z = ");
-  for (i = 0; i < n; i += 1) {
-    if (i > 0) {
-      printf("%+10.3lf ", c[i]);
-    } else {
-      printf("%10.3lf", c[i]);
-    }
-  }
-
-  for (i = 0; i < m; i += 1) {
-    printf("\t");
-    for (j = 0; j < n; j += 1) {
-      if (j > 0) {
-        printf("%+10.3lf", a[i][j]);
-      } else {
-        printf("%10.3lf", a[i][j]);
-      }
-    }
-    printf(" \u2264 %8.3lf\n", b[i]);
-  }
-
-  double res = intopt(m, n, a, b, c, x);
-
-  printf("ANSWER IS: %lf \n", res);
-  free(x);
-  for (i = 0; i < m; i += 1) {
-    free(a[i]);
-  }
-  free(a);
-  free(b);
-  free(c);
-  return 0;
 }
