@@ -38,6 +38,29 @@ struct simplex_t {
   double y;
 };
 
+void free_node(node_t *node) {
+  free(node->min);
+  free(node->max);
+  free(node->b);
+  free(node->x);
+  free(node->c);
+  for (int i = 0; i < node->m + 1; i++) {
+    free(node->a[i]);
+  }
+  free(node->a);
+  free(node);
+}
+
+bool isempty(set_t *h) {
+  while (h != NULL) {
+    if (h->node != NULL) {
+      return false;
+    }
+    h = h->succ;
+  }
+  return true;
+}
+
 set_t *new_set(node_t *node) {
   set_t *set = calloc(1, sizeof(set_t));
 
@@ -48,45 +71,33 @@ set_t *new_set(node_t *node) {
 }
 
 bool add(set_t *set, node_t *node) {
-  set_t *current = set;
-
-  while (current->succ != NULL) {
-    current = current->succ;
+  while (set->succ != NULL) {
+    set = set->succ;
   }
-  current->succ = new_set(node);
+  set->succ = new_set(node);
   return true;
 }
 
 bool remove_node(set_t *set, node_t *node) {
-  set_t *current = set;
-  set_t *temp;
-
-  if (set->node == node) {
-    if (set->succ == NULL) {
+  node_t *temp;
+  while (set != NULL) {
+    if (set->node == node) {
+      temp = set->node;
       set->node = NULL;
+      free_node(temp);
       return true;
     }
-    *set = *set->succ;
-    return true;
-  }
-
-  while (current->succ != NULL) {
-    if (current->succ->node == node) {
-      temp = current->succ;
-      current->succ = current->succ->succ;
-      return true;
-    } else if (current->succ != NULL) {
-      current = current->succ;
-    } else {
-      return false;
-    }
+    set = set->succ;
   }
   return false;
 }
 
 node_t *pop(set_t *set) {
+  while (set->node == NULL) {
+    set = set->succ;
+  }
   node_t *node = set->node;
-  remove_node(set, node);
+  set->node = NULL;
   return node;
 }
 
@@ -229,6 +240,7 @@ void bound(node_t *p, set_t *h, double *zp, double *x) {
                                        // current, men vi vågar inte
       }
       if (current->succ != NULL) {
+        set_t *temp = current;
         current = current->succ;
       } else {
         return;
@@ -261,15 +273,6 @@ int branch(node_t *q, double z) {
       q->h = h;
       q->xh = q->x[h];
 
-      for (i = 0; i < q->m; i += 1) {
-        free(q->a[i]);
-      }
-
-      free(q->a);
-      free(q->b);
-      free(q->c);
-      free(q->x);
-
       return 1;
     }
   }
@@ -290,16 +293,11 @@ void succ(node_t *p, set_t *h, int m, int n, double **a, double *b, double *c,
     if (integer(q)) {
       bound(q, h, zp, x);
     } else if (branch(q, *zp)) {
-      if (h->node == NULL) {
-        *h = *new_set(q);
-      } else {
-        add(h, q);
-      }
-
+      add(h, q);
       return;
     }
   }
-  free(q);
+  free_node(q);
 }
 
 double intopt(int m, int n, double **a, double *b, double *c, double *x) {
@@ -314,17 +312,38 @@ double intopt(int m, int n, double **a, double *b, double *c, double *x) {
     if (integer(p)) {
       memcpy(x, p->x, sizeof(double) * p->n); // onödigt?
       // delete p
+      // free(p);
+    }
+
+    while (h != NULL) {
+      if (h->node != NULL) {
+        free_node(h->node);
+      }
+      set_t *temp = h->succ;
+      free(h);
+      h = temp;
     }
 
     return z;
   }
   branch(p, z);
-  while (h->node != NULL) {
+  while (!isempty(h)) {
     p = pop(h);
     succ(p, h, m, n, a, b, c, p->h, 1, floor(p->xh), &z, x);
     succ(p, h, m, n, a, b, c, p->h, -1, -ceil(p->xh), &z, x);
+    free_node(p);
   }
-  free(p);
+
+  while (h != NULL) {
+    if (h->node != NULL) {
+      free_node(h->node);
+    }
+    set_t *temp = h->succ;
+    free(h);
+    h = temp;
+  }
+  // free(h->succ);
+
   if (z == -INFINITY) {
     return NAN;
   } else {
@@ -576,4 +595,48 @@ int initial(simplex_t *s, int m, int n, double **a, double *b, double *c,
 double simplex(int m, int n, double **a, double *b, double *c, double *x,
                double y) {
   return xsimplex(m, n, a, b, c, x, y, NULL, 0);
+}
+
+int main2() {
+  int i, j;
+  int m;
+  int n;
+  scanf("%d %d", &m, &n);
+  double *c;
+  double **a;
+  double *b;
+
+  c = calloc(n, sizeof(double));
+  a = calloc(m, sizeof(double *));
+  for (i = 0; i < m; i += 1) {
+    a[i] = calloc(n + 1, sizeof(double));
+  }
+  b = calloc(m, sizeof(double));
+
+  for (i = 0; i < n; i += 1) {
+    scanf("%lf", &c[i]);
+  }
+
+  for (i = 0; i < m; i += 1) {
+    for (j = 0; j < n; j += 1) {
+      scanf("%lf", &a[i][j]);
+    }
+  }
+
+  for (i = 0; i < m; i += 1) {
+    scanf("%lf", &b[i]);
+  }
+
+  double *x = calloc(m, sizeof(double));
+  double res = intopt(m, n, a, b, c, x);
+
+  printf("ANSWER IS: %lf \n", res);
+  free(x);
+  for (i = 0; i < m; i += 1) {
+    free(a[i]);
+  }
+  free(a);
+  free(b);
+  free(c);
+  return 0;
 }
